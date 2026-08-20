@@ -22,6 +22,7 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Model, Api, Provider } from "@earendil-works/pi-ai";
+import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -115,13 +116,13 @@ function isRateLimitError(message: string): boolean {
 export default function (pi: ExtensionAPI) {
 	let state = loadState();
 
-	/** Built-in openai-codex provider, resolved lazily from the registry. */
-	let baseProvider: Provider | undefined;
+	/** Built-in openai-codex provider from the bundled catalog. */
+	const baseProvider: Provider | undefined = builtinProviders().find(
+		(p) => p.id === BASE_PROVIDER,
+	);
 	const registered = new Set<string>();
 
-	function ensureProviders(ctx: ExtensionContext): boolean {
-		baseProvider ??= ctx.modelRegistry.getRegisteredNativeProvider(BASE_PROVIDER)
-			?? ctx.modelRegistry.getProvider(BASE_PROVIDER);
+	function ensureProviders(_ctx?: ExtensionContext): boolean {
 		if (!baseProvider) return false;
 		for (let n = 2; n <= state.accounts; n++) {
 			const id = providerName(n);
@@ -132,6 +133,9 @@ export default function (pi: ExtensionAPI) {
 		}
 		return true;
 	}
+
+	// Register clones at factory time so CLI --model/--list-models see them.
+	ensureProviders();
 
 	// -- helpers -------------------------------------------------------------
 
