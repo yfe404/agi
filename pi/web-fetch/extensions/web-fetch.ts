@@ -109,6 +109,7 @@ async function staticFetch(
 async function browserFetch(
 	url: string,
 	waitSeconds: number,
+	scrolls: number,
 	signal: AbortSignal | undefined,
 	workDir: string,
 ): Promise<string> {
@@ -118,6 +119,15 @@ import json, time
 page = ensure_page()
 cdp("Page.navigate", {"url": ${JSON.stringify(url)}}, session_id=page["session_id"])
 time.sleep(${waitSeconds})
+# Scroll to trigger lazy/infinite-scroll content; stop when height stabilizes.
+last_height = 0
+for _ in range(${scrolls}):
+    js("window.scrollTo(0, document.body.scrollHeight)")
+    time.sleep(1.5)
+    height = js("document.body.scrollHeight")
+    if not isinstance(height, (int, float)) or height == last_height:
+        break
+    last_height = height
 html = js("document.documentElement.outerHTML")
 with open(${JSON.stringify(htmlFile)}, "w") as f:
     f.write(html if isinstance(html, str) else json.dumps(html))
@@ -205,6 +215,7 @@ export default function (pi: ExtensionAPI) {
 			"Use web_fetch to read a page found via web_search or given by the user; prefer it over curl for pages, PDFs, and documents.",
 			"Pass render=true to web_fetch only when a previous fetch of the same URL returned blocked or incomplete content.",
 			"Pass text_only=true to web_fetch for link-dense pages (news indexes, listings) when you need the text, not the URLs.",
+			"Pass scroll=N (e.g. 5) to web_fetch for infinite-scroll pages like Reddit feeds or social timelines when the initial content is incomplete.",
 		],
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to fetch (http/https)" }),
@@ -242,6 +253,13 @@ export default function (pi: ExtensionAPI) {
 					description: "Strip all links and images from the Markdown, keeping only their text. Use for link-dense pages (news indexes, tables) to cut token noise. Default false.",
 				}),
 			),
+			scroll: Type.Optional(
+				Type.Number({
+					description: "Browser mode only: scroll to the bottom up to N times (1.5s pause each) to load lazy/infinite-scroll content (e.g. Reddit feeds). Stops early when page height stabilizes. Default 0, max 20. Implies render=true.",
+					minimum: 0,
+					maximum: 20,
+				}),
+			),
 		}),
 		async execute(_toolCallId, params, signal) {
 			const url = params.url;
@@ -251,7 +269,9 @@ export default function (pi: ExtensionAPI) {
 					isError: true,
 				};
 			}
-			const cacheKey = `${params.render ? "browser" : "auto"}:${url}`;
+			const scrolls = Math.min(Math.max(params.scroll ?? 0, 0), 20);
+			const forceBrowser = params.render || scrolls > 0;
+			const cacheKey = `${forceBrowser ? "browser" : "auto"}:scroll${scrolls}:${url}`;
 			let markdown: string;
 			let tier: string;
 			const cached = params.refresh ? undefined : cacheGet(cacheKey);
@@ -263,16 +283,16 @@ export default function (pi: ExtensionAPI) {
 				const waitSeconds = Math.min(params.wait_seconds ?? 3, 15);
 				tier = "static";
 				try {
-					if (params.render) {
-						tier = "browser";
-						markdown = await browserFetch(url, waitSeconds, signal, workDir);
+					if (forceBrowser) {
+						tier = scrolls > 0 ? `browser (${scrolls} scrolls max)` : "browser";
+						markdown = await browserFetch(url, waitSeconds, scrolls, signal, workDir);
 					} else {
 						const result = await staticFetch(url, signal, workDir);
 						if ("markdown" in result) {
 							markdown = result.markdown;
 						} else {
 							tier = `browser (static failed: ${result.retry})`;
-							markdown = await browserFetch(url, waitSeconds, signal, workDir);
+							markdown = await browserFetch(url, waitSeconds, 0, signal, workDir);
 						}
 					}
 				} catch (error) {

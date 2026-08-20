@@ -40,6 +40,10 @@ pi install ~/path/to/agi/pi/web-fetch
 - `refresh` — bypass the cache and re-fetch
 - `text_only` — strip links/images, keep display text (~50% smaller on
   link-dense pages like news indexes)
+- `scroll` — browser mode: scroll to the bottom up to N times (1.5s pause
+  each) to load infinite-scroll content; stops early when the page height
+  stabilizes. Implies `render=true`. Measured on a subreddit feed:
+  7× more content with `scroll=5`.
 
 ## Pagination consistency
 
