@@ -7,6 +7,7 @@ Personal collection of agent skills, pi extensions, and modules.
 | Path | What |
 |---|---|
 | [`pi/codex-rotate`](pi/codex-rotate/) | Pi extension: multi-account round-robin rotation for OpenAI Codex |
+| [`pi/web-search`](pi/web-search/) | Pi extension: `web_search` tool backed by Apify's Google Search Scraper |
 
 ## External projects
 

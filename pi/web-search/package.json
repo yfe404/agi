@@ -1,0 +1,27 @@
+{
+  "name": "@yfe404/pi-web-search-apify",
+  "version": "0.1.0",
+  "description": "Pi extension: web_search tool backed by Apify's Google Search Scraper (real Google SERP)",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "web-search",
+    "apify",
+    "google"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yfe404/agi",
+    "directory": "pi/web-search"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/web-search.ts"
+    ]
+  }
+}
