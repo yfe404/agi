@@ -37,6 +37,15 @@ pi install ~/path/to/agi/pi/web-fetch
 - `wait_seconds` — JS settle time after navigation in browser mode (default 3)
 - `max_chars` / `offset` — pagination for long documents (default 20 000 chars;
   truncated results include the offset to continue from)
+- `refresh` — bypass the cache and re-fetch
+
+## Pagination consistency
+
+Converted Markdown is cached per URL (in-memory LRU, 20 entries, ~10 min TTL),
+so `offset` calls slice the **same** document instead of re-fetching and
+re-rendering a page that may have changed between calls. This matters for the
+browser tier, where a re-render is slow and dynamic pages are not stable.
+Use `refresh=true` to force a fresh fetch.
 
 ## Notes
 

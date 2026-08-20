@@ -132,6 +132,42 @@ print("BYTES", len(html) if isinstance(html, str) else -1)
 	return toMarkdown(htmlFile, signal);
 }
 
+/**
+ * Render cache: pagination must slice the SAME document across calls, so the
+ * converted Markdown is kept per URL. Small LRU with TTL; refresh=true bypasses.
+ */
+interface CacheEntry {
+	markdown: string;
+	tier: string;
+	at: number;
+}
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 20;
+const cache = new Map<string, CacheEntry>();
+
+function cacheGet(key: string): CacheEntry | undefined {
+	const entry = cache.get(key);
+	if (!entry) return undefined;
+	if (Date.now() - entry.at > CACHE_TTL_MS) {
+		cache.delete(key);
+		return undefined;
+	}
+	// LRU touch: re-insert to move to the end of iteration order.
+	cache.delete(key);
+	cache.set(key, entry);
+	return entry;
+}
+
+function cacheSet(key: string, entry: CacheEntry): void {
+	cache.delete(key);
+	cache.set(key, entry);
+	while (cache.size > CACHE_MAX_ENTRIES) {
+		const oldest = cache.keys().next().value;
+		if (oldest === undefined) break;
+		cache.delete(oldest);
+	}
+}
+
 export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "web_fetch",
@@ -171,6 +207,11 @@ export default function (pi: ExtensionAPI) {
 					minimum: 0,
 				}),
 			),
+			refresh: Type.Optional(
+				Type.Boolean({
+					description: "Bypass the fetch cache and re-fetch the page (default false; results are cached ~10 min so offset pagination slices a consistent document)",
+				}),
+			),
 		}),
 		async execute(_toolCallId, params, signal) {
 			const url = params.url;
@@ -180,35 +221,44 @@ export default function (pi: ExtensionAPI) {
 					isError: true,
 				};
 			}
-			const workDir = mkdtempSync(join(tmpdir(), "web-fetch-"));
-			const waitSeconds = Math.min(params.wait_seconds ?? 3, 15);
+			const cacheKey = `${params.render ? "browser" : "auto"}:${url}`;
 			let markdown: string;
-			let tier = "static";
-			try {
-				if (params.render) {
-					tier = "browser";
-					markdown = await browserFetch(url, waitSeconds, signal, workDir);
-				} else {
-					const result = await staticFetch(url, signal, workDir);
-					if ("markdown" in result) {
-						markdown = result.markdown;
-					} else {
-						tier = `browser (static failed: ${result.retry})`;
+			let tier: string;
+			const cached = params.refresh ? undefined : cacheGet(cacheKey);
+			if (cached) {
+				markdown = cached.markdown;
+				tier = `${cached.tier} (cached)`;
+			} else {
+				const workDir = mkdtempSync(join(tmpdir(), "web-fetch-"));
+				const waitSeconds = Math.min(params.wait_seconds ?? 3, 15);
+				tier = "static";
+				try {
+					if (params.render) {
+						tier = "browser";
 						markdown = await browserFetch(url, waitSeconds, signal, workDir);
+					} else {
+						const result = await staticFetch(url, signal, workDir);
+						if ("markdown" in result) {
+							markdown = result.markdown;
+						} else {
+							tier = `browser (static failed: ${result.retry})`;
+							markdown = await browserFetch(url, waitSeconds, signal, workDir);
+						}
 					}
+				} catch (error) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `web_fetch failed (${tier}): ${error instanceof Error ? error.message : String(error)}`,
+							},
+						],
+						isError: true,
+					};
+				} finally {
+					rmSync(workDir, { recursive: true, force: true });
 				}
-			} catch (error) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: `web_fetch failed (${tier}): ${error instanceof Error ? error.message : String(error)}`,
-						},
-					],
-					isError: true,
-				};
-			} finally {
-				rmSync(workDir, { recursive: true, force: true });
+				cacheSet(cacheKey, { markdown, tier, at: Date.now() });
 			}
 
 			const offset = params.offset ?? 0;
