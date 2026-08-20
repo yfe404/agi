@@ -38,6 +38,8 @@ pi install ~/path/to/agi/pi/web-fetch
 - `max_chars` / `offset` — pagination for long documents (default 20 000 chars;
   truncated results include the offset to continue from)
 - `refresh` — bypass the cache and re-fetch
+- `text_only` — strip links/images, keep display text (~50% smaller on
+  link-dense pages like news indexes)
 
 ## Pagination consistency
 
@@ -46,6 +48,10 @@ so `offset` calls slice the **same** document instead of re-fetching and
 re-rendering a page that may have changed between calls. This matters for the
 browser tier, where a re-render is slow and dynamic pages are not stable.
 Use `refresh=true` to force a fresh fetch.
+
+When the fetch used anything other than a plain static request (browser
+fallback, forced render, or cache hit), the returned content starts with a
+`[fetched via ...]` provenance line so the model knows what it is reading.
 
 ## Notes
 

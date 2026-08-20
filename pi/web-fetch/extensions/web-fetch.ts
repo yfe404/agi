@@ -158,6 +158,30 @@ function cacheGet(key: string): CacheEntry | undefined {
 	return entry;
 }
 
+/**
+ * Remove link/image syntax, keeping display text. Cuts token noise on
+ * link-dense pages (indexes, tables) where URLs dominate the Markdown.
+ */
+function stripLinks(markdown: string): string {
+	return (
+		markdown
+			// images: ![alt](src) -> alt
+			.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+			// links: [text](href) -> text (repeat for nested [a [b](c)](d) cases)
+			.replace(/\[([^\][]*)\]\([^)]*\)/g, "$1")
+			.replace(/\[([^\][]*)\]\([^)]*\)/g, "$1")
+			// reference-style links: [text][ref] -> text
+			.replace(/\[([^\][]*)\]\[[^\]]*\]/g, "$1")
+			// bare autolinks: <https://...> -> (removed)
+			.replace(/<https?:\/\/[^>]+>/g, "")
+			// drop table rows that are only pipes/whitespace after link removal
+			.replace(/^[|\s-]+$/gm, "")
+			// collapse whitespace bloat left behind
+			.replace(/[ \t]{3,}/g, " ")
+			.replace(/\n{4,}/g, "\n\n\n")
+	);
+}
+
 function cacheSet(key: string, entry: CacheEntry): void {
 	cache.delete(key);
 	cache.set(key, entry);
@@ -180,6 +204,7 @@ export default function (pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Use web_fetch to read a page found via web_search or given by the user; prefer it over curl for pages, PDFs, and documents.",
 			"Pass render=true to web_fetch only when a previous fetch of the same URL returned blocked or incomplete content.",
+			"Pass text_only=true to web_fetch for link-dense pages (news indexes, listings) when you need the text, not the URLs.",
 		],
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to fetch (http/https)" }),
@@ -197,8 +222,8 @@ export default function (pi: ExtensionAPI) {
 			),
 			max_chars: Type.Optional(
 				Type.Number({
-					description: "Truncate returned Markdown to this many characters (default 20000)",
-					minimum: 1000,
+					description: "Truncate returned Markdown to this many characters (default 20000, values below 500 are clamped up to 500)",
+					minimum: 1,
 				}),
 			),
 			offset: Type.Optional(
@@ -210,6 +235,11 @@ export default function (pi: ExtensionAPI) {
 			refresh: Type.Optional(
 				Type.Boolean({
 					description: "Bypass the fetch cache and re-fetch the page (default false; results are cached ~10 min so offset pagination slices a consistent document)",
+				}),
+			),
+			text_only: Type.Optional(
+				Type.Boolean({
+					description: "Strip all links and images from the Markdown, keeping only their text. Use for link-dense pages (news indexes, tables) to cut token noise. Default false.",
 				}),
 			),
 		}),
@@ -261,12 +291,19 @@ export default function (pi: ExtensionAPI) {
 				cacheSet(cacheKey, { markdown, tier, at: Date.now() });
 			}
 
+			const body = params.text_only ? stripLinks(markdown) : markdown;
 			const offset = params.offset ?? 0;
-			const maxChars = params.max_chars ?? 20_000;
-			const total = markdown.length;
-			let text = markdown.slice(offset, offset + maxChars);
+			const maxChars = Math.max(params.max_chars ?? 20_000, 500);
+			const total = body.length;
+			let text = body.slice(offset, offset + maxChars);
 			if (offset + maxChars < total) {
-				text += `\n\n[truncated: showing ${offset}-${offset + maxChars} of ${total} chars — call web_fetch again with offset=${offset + maxChars}]`;
+				text += `\n\n[truncated: showing ${offset}-${offset + maxChars} of ${total} chars — call web_fetch again with offset=${offset + maxChars}${params.text_only ? " and text_only=true" : ""}]`;
+			}
+			// The LLM only sees `content`, so prepend fetch provenance when it is
+			// surprising (fallback or cache) — the model should know a static fetch
+			// was blocked or that it is reading a cached snapshot.
+			if (tier !== "static") {
+				text = `[fetched via ${tier}]\n${text}`;
 			}
 			return {
 				content: [{ type: "text", text }],
