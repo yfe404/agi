@@ -1,0 +1,27 @@
+{
+  "name": "@yfe404/pi-web-fetch",
+  "version": "0.1.0",
+  "description": "Pi extension: web_fetch tool — URL to Markdown via markitdown, with ghost-browser stealth fallback",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "web-fetch",
+    "markitdown",
+    "ghost-browser"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yfe404/agi",
+    "directory": "pi/web-fetch"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/web-fetch.ts"
+    ]
+  }
+}
