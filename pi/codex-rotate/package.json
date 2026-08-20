@@ -1,0 +1,27 @@
+{
+  "name": "@yfe404/pi-codex-rotate",
+  "version": "0.1.0",
+  "description": "Pi extension: multi-account round-robin rotation for OpenAI Codex subscriptions",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "codex",
+    "multi-account",
+    "round-robin"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yfe404/agi",
+    "directory": "pi/codex-rotate"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/codex-rotate.ts"
+    ]
+  }
+}
