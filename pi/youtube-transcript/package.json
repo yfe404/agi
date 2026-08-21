@@ -1,0 +1,27 @@
+{
+  "name": "@yfe404/pi-youtube-transcript-apify",
+  "version": "0.1.0",
+  "description": "Pi extension: youtube_transcript tool backed by Apify's official YouTube Scraper (streamers/youtube-scraper)",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "youtube",
+    "transcript",
+    "apify"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yfe404/agi",
+    "directory": "pi/youtube-transcript"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/youtube-transcript.ts"
+    ]
+  }
+}
