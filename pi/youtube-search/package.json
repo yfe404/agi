@@ -1,0 +1,27 @@
+{
+  "name": "@yfe404/pi-youtube-search-apify",
+  "version": "0.1.0",
+  "description": "Pi extension: youtube_search tool backed by Apify's official YouTube Scraper (streamers/youtube-scraper)",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "youtube",
+    "search",
+    "apify"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yfe404/agi",
+    "directory": "pi/youtube-search"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/youtube-search.ts"
+    ]
+  }
+}
